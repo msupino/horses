@@ -12,10 +12,16 @@
   .sub { font-size: 0.75rem; color: #64748b; margin-bottom: 28px; }
   .horse { font-size: 4rem; margin-bottom: 20px; }
   .question { font-size: 0.95rem; margin-bottom: 16px; color: #cbd5e1; }
-  .buttons { display: flex; gap: 12px; justify-content: center; margin-bottom: 24px; }
-  .btn { padding: 10px 28px; border: 2px solid #334155; border-radius: 10px; background: #0f172a; color: #e2e8f0; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-  .btn:hover { border-color: #60a5fa; color: #60a5fa; }
-  .btn.selected { border-color: #3b82f6; background: #1e3a5f; color: #60a5fa; }
+  .coat-selector { margin-bottom: 24px; }
+  .coat-label { font-size: 0.8rem; color: #94a3b8; margin-bottom: 12px; }
+  .coat-slider { position: relative; padding: 0 4px; }
+  .coat-slider input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px; background: linear-gradient(to right, #3b82f6, #60a5fa, #fbbf24, #f97316); outline: none; cursor: pointer; }
+  .coat-slider input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #e2e8f0; border: 3px solid #3b82f6; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3); transition: border-color 0.2s; }
+  .coat-slider input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: #e2e8f0; border: 3px solid #3b82f6; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+  .coat-stops { display: flex; justify-content: space-between; margin-top: 8px; }
+  .coat-stop { font-size: 0.65rem; color: #64748b; text-align: center; flex: 1; transition: color 0.2s, font-weight 0.2s; }
+  .coat-stop.active { color: #60a5fa; font-weight: 700; }
+  .coat-info { margin-top: 10px; font-size: 0.75rem; color: #94a3b8; min-height: 20px; }
   .result { display: none; margin-top: 20px; padding: 20px; border-radius: 12px; }
   .result.yes { background: #422006; border: 1px solid #92400e; }
   .result.no { background: #052e16; border: 1px solid #166534; }
@@ -55,10 +61,18 @@
   </div>
 
   <div id="question-section">
-    <div class="question">האם הסוס מגולח?</div>
-    <div class="buttons">
-      <button class="btn" id="btn-yes" onclick="answer(true)">כן</button>
-      <button class="btn" id="btn-no" onclick="answer(false)">לא</button>
+    <div class="question">סוג הפרווה</div>
+    <div class="coat-selector">
+      <div class="coat-slider">
+        <input type="range" id="coat-range" min="0" max="3" step="1" value="0" oninput="onCoatChange(this.value)">
+      </div>
+      <div class="coat-stops">
+        <span class="coat-stop active" id="stop-0">מגולח</span>
+        <span class="coat-stop" id="stop-1">קצר</span>
+        <span class="coat-stop" id="stop-2">ארוך</span>
+        <span class="coat-stop" id="stop-3">חורפי</span>
+      </div>
+      <div class="coat-info" id="coat-info">סף: מתחת ל-15°C</div>
     </div>
   </div>
 
@@ -68,7 +82,7 @@
 <div class="forecast" id="forecast">
   <h2>תחזית ל-7 ימים הקרובים</h2>
   <div class="forecast-grid" id="forecast-grid">
-    <span class="loading">ענה על השאלה למעלה כדי לראות תחזית</span>
+    <span class="loading">טוען תחזית...</span>
   </div>
 </div>
 </div>
@@ -81,7 +95,14 @@ let currentTemp = null;
 let cachedDaily = null;
 let cachedHourlyTimes = null;
 let cachedHourlyTemps = null;
-let isClipped = null;
+let coatType = 0;
+
+const COAT_TYPES = [
+  { name: 'מגולח', threshold: 15, desc: 'סף: מתחת ל-15°C' },
+  { name: 'קצר', threshold: 12, desc: 'סף: מתחת ל-12°C' },
+  { name: 'ארוך', threshold: 8, desc: 'סף: מתחת ל-8°C' },
+  { name: 'חורפי', threshold: 5, desc: 'סף: מתחת ל-5°C' },
+];
 
 const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 const WEATHER_ICONS = {
@@ -157,13 +178,13 @@ function overnightMin(dayDateStr, hourlyTimes, hourlyTemps) {
 }
 
 function renderWeeklyForecast() {
-  if (!cachedDaily || isClipped === null) return;
+  if (!cachedDaily) return;
   const grid = document.getElementById('forecast-grid');
   const dates = cachedDaily.time;
   const maxTemps = cachedDaily.temperature_2m_max;
   const minTemps = cachedDaily.temperature_2m_min;
   const codes = cachedDaily.weathercode;
-  const threshold = isClipped ? 15 : 10;
+  const threshold = COAT_TYPES[coatType].threshold;
 
   let html = '';
   for (let i = 1; i < dates.length - 1; i++) {
@@ -191,19 +212,20 @@ function renderWeeklyForecast() {
   grid.innerHTML = html;
 }
 
-function answer(clipped) {
-  document.getElementById('btn-yes').classList.toggle('selected', clipped);
-  document.getElementById('btn-no').classList.toggle('selected', !clipped);
-  isClipped = clipped;
+function onCoatChange(val) {
+  coatType = parseInt(val);
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('stop-' + i).classList.toggle('active', i === coatType);
+  }
+  document.getElementById('coat-info').textContent = COAT_TYPES[coatType].desc;
+
   renderWeeklyForecast();
 
   if (minTemp === null || minTemp === Infinity) return;
 
-  const threshold = clipped ? 15 : 10;
-  const needsBlanket = minTemp < threshold;
+  const coat = COAT_TYPES[coatType];
+  const needsBlanket = minTemp < coat.threshold;
   const el = document.getElementById('result');
-
-  const type = clipped ? 'מגולח' : 'לא מגולח';
 
   if (needsBlanket) {
     el.className = 'result yes';
@@ -212,7 +234,7 @@ function answer(clipped) {
       `<div class="answer">כן, צריך קובן!</div>` +
       `<div class="details">` +
         `מינימום הלילה: ${minTemp}°C (בשעה ${minTime})<br>` +
-        `סף ל${type}: מתחת ל-${threshold}°C` +
+        `פרווה: ${coat.name} — סף: מתחת ל-${coat.threshold}°C` +
       `</div>`;
   } else {
     el.className = 'result no';
@@ -221,11 +243,18 @@ function answer(clipped) {
       `<div class="answer">לא צריך קובן</div>` +
       `<div class="details">` +
         `מינימום הלילה: ${minTemp}°C (בשעה ${minTime})<br>` +
-        `סף ל${type}: מתחת ל-${threshold}°C` +
+        `פרווה: ${coat.name} — סף: מתחת ל-${coat.threshold}°C` +
       `</div>`;
   }
   el.style.display = 'block';
 }
+
+// Auto-trigger on load once forecast is ready
+const _origFetch = fetchForecast;
+fetchForecast = async function() {
+  await _origFetch();
+  onCoatChange(document.getElementById('coat-range').value);
+};
 
 fetchForecast();
 </script>
