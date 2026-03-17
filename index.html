@@ -72,7 +72,7 @@
         <span class="coat-stop" id="stop-2">ארוך</span>
         <span class="coat-stop" id="stop-3">חורפי</span>
       </div>
-      <div class="coat-info" id="coat-info">סף: מתחת ל-15°C</div>
+      <div class="coat-info" id="coat-info">סף: מתחת ל-10°C — ללא שכבת בידוד</div>
     </div>
   </div>
 
@@ -98,10 +98,10 @@ let cachedHourlyTemps = null;
 let coatType = 0;
 
 const COAT_TYPES = [
-  { name: 'מגולח', threshold: 15, desc: 'סף: מתחת ל-15°C' },
-  { name: 'קצר', threshold: 12, desc: 'סף: מתחת ל-12°C' },
-  { name: 'ארוך', threshold: 8, desc: 'סף: מתחת ל-8°C' },
-  { name: 'חורפי', threshold: 5, desc: 'סף: מתחת ל-5°C' },
+  { name: 'מגולח', threshold: 10, desc: 'סף: מתחת ל-10°C — ללא שכבת בידוד' },
+  { name: 'קצר', threshold: 5, desc: 'סף: מתחת ל-5°C — בידוד חלקי' },
+  { name: 'ארוך', threshold: 0, desc: 'סף: מתחת ל-0°C — בידוד טוב' },
+  { name: 'חורפי', threshold: -5, desc: 'סף: מתחת ל-5°C- — בידוד מלא' },
 ];
 
 const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
