@@ -1,6 +1,6 @@
 # horse-blanket
 
-Web app for Efona Ranch that tells horse owners whether their horse needs a blanket tonight. Uses overnight minimum temperature and coat type to give a yes/no recommendation.
+Web app for Epona Stables that tells horse owners whether their horse needs a blanket tonight. Uses overnight minimum temperature and coat type to give a blanket recommendation.
 
 ## Features
 
@@ -22,6 +22,6 @@ Open http://localhost:9999
 
 ## Usage
 
-1. Open the page — forecast loads from Open-Meteo (location: Efona Ranch)
+1. Open the page — forecast loads from Open-Meteo (location: Epona Stables)
 2. Select coat type via the slider
 3. View tonight's recommendation and the 7-day overnight forecast
