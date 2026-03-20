@@ -72,7 +72,7 @@
         <span class="coat-stop" id="stop-2">ארוך</span>
         <span class="coat-stop" id="stop-3">חורפי</span>
       </div>
-      <div class="coat-info" id="coat-info">סף: מתחת ל-15°C — ללא שכבת בידוד</div>
+      <div class="coat-info" id="coat-info">ללא שכבת בידוד</div>
     </div>
   </div>
 
@@ -99,10 +99,10 @@ let cachedHourlyTemps = null;
 let coatType = 0;
 
 const COAT_TYPES = [
-  { name: 'מגולח', threshold: 15, desc: 'סף: מתחת ל-15°C — ללא שכבת בידוד' },
-  { name: 'קצר', threshold: 10, desc: 'סף: מתחת ל-10°C — בידוד חלקי' },
-  { name: 'ארוך', threshold: 5, desc: 'סף: מתחת ל-5°C — בידוד טוב' },
-  { name: 'חורפי', threshold: 0, desc: 'סף: מתחת ל-0°C — בידוד מלא' },
+  { name: 'מגולח', threshold: 15, desc: 'ללא שכבת בידוד' },
+  { name: 'קצר', threshold: 10, desc: 'בידוד חלקי' },
+  { name: 'ארוך', threshold: 5, desc: 'בידוד טוב' },
+  { name: 'חורפי', threshold: 0, desc: 'בידוד מלא' },
 ];
 
 const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -285,7 +285,7 @@ function onCoatChange(val) {
       `<div class="answer">כן, צריך קובן!</div>` +
       `<div class="details">` +
         `מינימום הלילה: ${minTemp}°C${flNote}<br>` +
-        `פרווה: ${coat.name} — סף: מתחת ל-${coat.threshold}°C` +
+        `פרווה: ${coat.name} — ${coat.desc}` +
       `</div>`;
   } else {
     el.className = 'result no';
@@ -294,7 +294,7 @@ function onCoatChange(val) {
       `<div class="answer">לא צריך קובן</div>` +
       `<div class="details">` +
         `מינימום הלילה: ${minTemp}°C${flNote}<br>` +
-        `פרווה: ${coat.name} — סף: מתחת ל-${coat.threshold}°C` +
+        `פרווה: ${coat.name} — ${coat.desc}` +
       `</div>`;
   }
   el.style.display = 'block';
