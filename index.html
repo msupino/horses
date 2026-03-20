@@ -243,7 +243,7 @@ function renderWeeklyForecast() {
     const avgLo = avgOvernightMin(dates[i]);
     const lo = avgLo !== null ? avgLo : minTemps[i];
 
-    const needsBlanket = lo < threshold;
+    const needsBlanket = Math.floor(lo) <= threshold;
     const blanketHtml = needsBlanket
       ? '<span class="forecast-blanket blanket-yes">צריך קובן</span>'
       : '<span class="forecast-blanket blanket-no">בלי קובן</span>';
@@ -274,7 +274,7 @@ function onCoatChange(val) {
 
   const coat = COAT_TYPES[coatType];
   const effectiveTemp = minFeelsLike;
-  const needsBlanket = effectiveTemp < coat.threshold;
+  const needsBlanket = Math.floor(effectiveTemp) <= coat.threshold;
   const el = document.getElementById('result');
   const flNote = minFeelsLike < minTemp ? `<br>מרגיש כמו: ${minFeelsLike}°C (רוח + לחות)` : '';
 
