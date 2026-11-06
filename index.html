@@ -91,11 +91,8 @@
 const LAT = 32.18, LON = 34.88;
 let minTemp = null;
 let minFeelsLike = null;
-let minTime = null;
 let currentTemp = null;
 let cachedDaily = null;
-let cachedHourlyTimes = null;
-let cachedHourlyTemps = null;
 let coatType = 0;
 
 function readSavedCoatType() {
@@ -140,31 +137,32 @@ let modelResults = [];
 async function fetchForecast() {
   const display = document.getElementById('temp-display');
   try {
-    const fetches = MODELS.map(m => fetch(m.url).then(r => r.json()).catch(() => null));
+    const fetches = MODELS.map(m => fetch(m.url).then(r => r.ok ? r.json() : null).catch(() => null));
     const results = await Promise.all(fetches);
     modelResults = [];
 
     let primaryData = null;
     for (let mi = 0; mi < results.length; mi++) {
       const data = results[mi];
-      if (!data || !data.hourly) continue;
+      if (!Array.isArray(data?.hourly?.time) || !Array.isArray(data.hourly.temperature_2m)) continue;
       if (!primaryData) primaryData = data;
 
       const times = data.hourly.time;
       const temps = data.hourly.temperature_2m;
-      const feelsLike = data.hourly.apparent_temperature || temps;
-      const now = new Date();
-      const tomorrow7am = new Date(now);
-      tomorrow7am.setDate(tomorrow7am.getDate() + 1);
-      tomorrow7am.setHours(7, 0, 0, 0);
+      const apparentTemps = data.hourly.apparent_temperature;
+      const feelsLike = temps.map((temp, i) => Number.isFinite(apparentTemps?.[i]) ? apparentTemps[i] : temp);
+      const now = jerusalemDateTime();
+      const cutoffDate = now.slice(0, 10);
+      const cutoffHour = Number(now.slice(11, 13));
+      const cutoff = `${cutoffHour < 7 ? cutoffDate : addDays(cutoffDate, 1)}T07:00`;
 
       let mMin = Infinity, mMinFL = Infinity, mTime = '';
       for (let i = 0; i < times.length; i++) {
-        const t = new Date(times[i]);
-        if (t >= now && t <= tomorrow7am) {
+        const t = times[i];
+        if (t >= now && t <= cutoff && Number.isFinite(temps[i]) && Number.isFinite(feelsLike[i])) {
+          if (temps[i] < mMin) mMin = temps[i];
           if (feelsLike[i] < mMinFL) {
             mMinFL = feelsLike[i];
-            mMin = temps[i];
             mTime = times[i].slice(11, 16);
           }
         }
@@ -185,23 +183,17 @@ async function fetchForecast() {
 
     if (!modelResults.length) {
       display.innerHTML = '<span class="error">אין נתוני תחזית זמינים</span>';
+      document.getElementById('forecast-grid').innerHTML = '<span class="error">אין נתוני תחזית זמינים</span>';
       return;
     }
 
     currentTemp = primaryData.current_weather ? primaryData.current_weather.temperature : modelResults[0].min;
     minTemp = Math.round(modelResults.reduce((s, m) => s + m.min, 0) / modelResults.length * 10) / 10;
     minFeelsLike = Math.round(modelResults.reduce((s, m) => s + m.minFL, 0) / modelResults.length * 10) / 10;
-    minTime = modelResults[0].time;
-
-    cachedDaily = primaryData.daily;
-    cachedHourlyTimes = primaryData.hourly.time;
-    cachedHourlyTemps = primaryData.hourly.time.map((_, i) => {
-      let sum = 0, cnt = 0;
-      for (const mr of modelResults) {
-        if (i < mr.hourlyFeelsLike.length && mr.hourlyFeelsLike[i] != null) { sum += mr.hourlyFeelsLike[i]; cnt++; }
-      }
-      return cnt ? Math.round(sum / cnt * 10) / 10 : (primaryData.hourly.apparent_temperature || primaryData.hourly.temperature_2m)[i];
-    });
+    cachedDaily = primaryData.daily || modelResults.find(m => m.daily)?.daily || null;
+    if (!Array.isArray(cachedDaily?.time)) {
+      document.getElementById('forecast-grid').innerHTML = '<span class="error">תחזית הלילה זמינה, אך התחזית השבועית אינה זמינה</span>';
+    }
 
     const modelDetail = modelResults.map(m => `${m.name}: ${m.minFL}°C`).join(' · ');
     const flDiff = minFeelsLike < minTemp ? ` (מרגיש כמו <span class="deg">${minFeelsLike}°C</span>)` : '';
@@ -212,23 +204,37 @@ async function fetchForecast() {
 
   } catch (e) {
     display.innerHTML = '<span class="error">שגיאה בקבלת מזג האוויר. נסה לרענן.</span>';
+    document.getElementById('forecast-grid').innerHTML = '<span class="error">שגיאה בקבלת התחזית. נסה לרענן.</span>';
   }
 }
 
 function overnightMin(dayDateStr, hourlyTimes, hourlyTemps) {
-  const eveningStart = new Date(dayDateStr + 'T18:00:00');
-  const morningEnd = new Date(eveningStart);
-  morningEnd.setDate(morningEnd.getDate() + 1);
-  morningEnd.setHours(7, 0, 0, 0);
+  const eveningStart = `${dayDateStr}T18:00`;
+  const morningEnd = `${addDays(dayDateStr, 1)}T07:00`;
 
   let lo = Infinity;
   for (let i = 0; i < hourlyTimes.length; i++) {
-    const t = new Date(hourlyTimes[i]);
-    if (t >= eveningStart && t <= morningEnd) {
+    const t = hourlyTimes[i];
+    if (t >= eveningStart && t <= morningEnd && Number.isFinite(hourlyTemps[i])) {
       if (hourlyTemps[i] < lo) lo = hourlyTemps[i];
     }
   }
   return lo === Infinity ? null : lo;
+}
+
+function jerusalemDateTime() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}T${value.hour}:${value.minute}`;
+}
+
+function addDays(dateString, days) {
+  const date = new Date(`${dateString}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function avgOvernightMin(dayDateStr) {
@@ -241,32 +247,30 @@ function avgOvernightMin(dayDateStr) {
 }
 
 function renderWeeklyForecast() {
-  if (!cachedDaily) return;
+  if (!Array.isArray(cachedDaily?.time) || !cachedDaily.time.length) return;
   const grid = document.getElementById('forecast-grid');
   const dates = cachedDaily.time;
-  const minTemps = cachedDaily.temperature_2m_min;
-  const codes = cachedDaily.weathercode;
+  const codes = cachedDaily.weather_code || cachedDaily.weathercode;
   const threshold = COAT_TYPES[coatType].threshold;
 
   let html = '';
-  for (let i = 1; i < dates.length - 1; i++) {
-    const d = new Date(dates[i] + 'T00:00:00');
-    const dayName = 'ליל ' + DAY_NAMES[d.getDay()];
+  for (let i = 0; i < dates.length - 1; i++) {
+    const d = new Date(`${dates[i]}T00:00:00Z`);
+    const dayName = 'ליל ' + DAY_NAMES[d.getUTCDay()];
     const icon = codes ? (WEATHER_ICONS[codes[i]] || '🌡️') : '🌡️';
     const avgLo = avgOvernightMin(dates[i]);
-    const lo = avgLo !== null ? avgLo : minTemps[i];
-
-    const needsBlanket = Math.floor(lo) <= threshold;
-    const blanketHtml = needsBlanket
-      ? '<span class="forecast-blanket blanket-yes">צריך קובן</span>'
-      : '<span class="forecast-blanket blanket-no">בלי קובן</span>';
+    const blanketHtml = avgLo === null
+      ? '<span class="forecast-blanket">אין נתונים</span>'
+      : avgLo < threshold
+        ? '<span class="forecast-blanket blanket-yes">צריך קובן</span>'
+        : '<span class="forecast-blanket blanket-no">בלי קובן</span>';
 
     html += `
       <div class="forecast-row">
         <span class="forecast-day">${dayName}</span>
         <span class="forecast-icon">${icon}</span>
         <span class="forecast-temps">
-          <span class="lo">${lo}°</span>
+          <span class="lo">${avgLo === null ? '—' : `${avgLo}°`}</span>
         </span>
         ${blanketHtml}
       </div>`;
@@ -290,7 +294,7 @@ function onCoatChange(val) {
 
   const coat = COAT_TYPES[coatType];
   const effectiveTemp = minFeelsLike;
-  const needsBlanket = Math.floor(effectiveTemp) <= coat.threshold;
+  const needsBlanket = effectiveTemp < coat.threshold;
   const el = document.getElementById('result');
   const flNote = minFeelsLike < minTemp ? `<br>מרגיש כמו: ${minFeelsLike}°C (רוח + לחות)` : '';
 
